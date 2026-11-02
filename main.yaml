@@ -1,0 +1,117 @@
+# ESP32-S3 Corsair Commander Pro Emulation — ESPHome
+#
+# Emulates a Corsair Commander Pro (VID: 0x1B1C, PID: 0x0C10)
+# to bind natively to the Linux kernel 'corsair-cpro' hwmon module.
+
+esphome:
+  name: pc-temp-sensor
+  friendly_name: "Corsair Commander Pro"
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  framework:
+    type: esp-idf
+
+# ── Local external component: Corsair Commander Pro ────────────
+external_components:
+  - source:
+      type: local
+      path: components
+
+# ── Custom Corsair Commander Pro component ─────────────────────
+# Maps ESPHome sensors directly into Corsair Commander Pro channels:
+#   - temp_1 .. temp_4 : Temperature probes in °C
+#   - volt_12v, volt_5v, volt_3v3 : Power rail voltages in V
+#   - fan_1_rpm : Fan 1 speed in RPM
+#
+# Alternatively, any automation or lambda can push values directly:
+#   id(cpro_dev).set_temperature(channel, temp_c);
+#   id(cpro_dev).set_voltage(rail_index, volts);
+#   id(cpro_dev).set_fan_rpm(fan_index, rpm);
+corsair_cpro:
+  id: cpro_dev
+  temp_1: temperature_sensor     # Real NTC thermistor reading
+  temp_2: esp32_internal_t       # ESP32-S3 internal chip temperature
+  temp_3: stub_temp_3            # Example stub temperature
+  temp_4: stub_temp_4            # Example stub temperature
+  volt_12v: stub_volt_12v        # Example 12V rail voltage
+  volt_5v: stub_volt_5v          # Example 5V rail voltage
+  volt_3v3: stub_volt_3v3        # Example 3.3V rail voltage
+  fan_1_rpm: stub_fan_1_rpm      # Example fan speed
+
+# ── Sensors ────────────────────────────────────────────────────
+sensor:
+  # ── Channel 1: Real External NTC Thermistor ──────────────────
+  - platform: ntc
+    sensor: thermistor_resistance
+    name: "Temperature"
+    id: temperature_sensor
+    calibration:
+      b_constant: 3950
+      reference_temperature: 25°C
+      reference_resistance: 10kOhm
+
+  - platform: resistance
+    id: thermistor_resistance
+    sensor: thermistor_adc
+    configuration: DOWNSTREAM   # NTC is between the ADC pin and GND
+    resistor: 10kOhm            # Pull-up resistor value
+
+  - platform: adc
+    id: thermistor_adc
+    pin: GPIO4
+    attenuation: 12db           # Full 0–3.3V range
+    update_interval: 1s
+    samples: 16
+
+  # ── Channels 3 & 4: Example stub temperature sensors ─────────
+  - platform: template
+    name: "Stub Temp 3"
+    id: stub_temp_3
+    unit_of_measurement: "°C"
+    update_interval: 5s
+    lambda: |-
+      return 28.5f;
+
+  - platform: template
+    name: "Stub Temp 4"
+    id: stub_temp_4
+    unit_of_measurement: "°C"
+    update_interval: 5s
+    lambda: |-
+      return 33.2f;
+
+  # ── Example stub voltage rail sensors ────────────────────────
+  - platform: template
+    name: "Stub Voltage 12V"
+    id: stub_volt_12v
+    unit_of_measurement: "V"
+    update_interval: 10s
+    lambda: |-
+      return 12.18f;
+
+  - platform: template
+    name: "Stub Voltage 5V"
+    id: stub_volt_5v
+    unit_of_measurement: "V"
+    update_interval: 10s
+    lambda: |-
+      return 5.06f;
+
+  - platform: template
+    name: "Stub Voltage 3.3V"
+    id: stub_volt_3v3
+    unit_of_measurement: "V"
+    update_interval: 10s
+    lambda: |-
+      return 3.33f;
+
+  # ── Example stub fan RPM sensor ──────────────────────────────
+  - platform: template
+    name: "Stub Fan 1 RPM"
+    id: stub_fan_1_rpm
+    unit_of_measurement: "RPM"
+    update_interval: 5s
+    lambda: |-
+      return 1350.0f;
